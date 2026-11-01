@@ -37,9 +37,9 @@ export async function handleGang(req,res,path){
  else if(['mod','random'].includes(b.cmd)){
  if(b.cmd==='random'){const pool=Object.keys(mods).filter(k=>mods[k][0]===b.value&&!r.mods.includes(k));if(!pool.length)throw Error('该组已选满');b.value=pool[randomInt(pool.length)]}
  if(r.phase!=='lobby'||!Object.hasOwn(mods,b.value))throw Error('配置无效');r.undo??=[];r.undo.push([...r.mods]);r.mods=r.mods.includes(b.value)?r.mods.filter(k=>k!==b.value):[...r.mods,b.value]}
- else if(b.cmd==='start'){if(r.phase!=='lobby'||r.players.length<3)throw Error('需要 3–6 人');deal(r)}
+ else if(b.cmd==='start'){if(r.phase!=='lobby'||r.players.length<3)throw Error('需要 3–6 人');r.initialMods=[...r.mods];deal(r)}
  else if(b.cmd==='next'){if(r.phase!=='result'||Math.max(r.wins,r.losses)>=3)throw Error('无法继续');deal(r)}
- else if(b.cmd==='again'){if(r.phase!=='result'||Math.max(r.wins,r.losses)!==3)throw Error('比赛未结束');Object.assign(r,{phase:'lobby',wins:0,losses:0,hands:null,board:null,history:[],chips:[],ready:[],stage:0})}
+ else if(b.cmd==='again'){if(r.phase!=='result'||Math.max(r.wins,r.losses)!==3)throw Error('比赛未结束');r.mods=r.initialMods||r.mods;r.undo=[];Object.assign(r,{phase:'lobby',wins:0,losses:0,hands:null,board:null,history:[],chips:[],ready:[],stage:0})}
  else act(r,i,b.cmd,b.value)}
  r.v++;commit(r);json({...view(r,i),...(['create','join'].includes(b.cmd)?{token:r.players[i].token}:{})})
  }catch(e){json({error:e.message},400)}

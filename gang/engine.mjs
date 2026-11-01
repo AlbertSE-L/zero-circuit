@@ -57,12 +57,18 @@ export function act(r,i,cmd,value){
  const scores=r.hands.map(h=>strength([...h,...r.board]));
  const ordered=r.chips.map((_,j)=>j).sort((a,b)=>r.chips[a]-r.chips[b]);
  r.success=ordered.every((j,k)=>!k||scores[ordered[k-1]]<=scores[j]);
- r.success?r.wins++:r.losses++;r.phase='result'
+  r.success?r.wins++:r.losses++;
+ const group=r.success?'减益':'增益';
+ const pool=Object.keys(mods).filter(id=>mods[id][0]===group&&!r.mods.includes(id));
+ const added=pool.length?pool[randomInt(pool.length)]:null;
+ if(added)r.mods.push(added);
+ r.reward={group,added};
+ r.phase='result'
 }
 export function view(r,i){
  const end=r.phase==='result', has=k=>r.mods.includes(k), visible=[has('peek')?1:0,3,has('turn')?3:4,has('blind')?4:5][r.stage]||0;
  const board=(r.board||[]).slice(0,end?5:visible);
- return {events:(r.events||[]).filter(event=>end||!has('mute')&&(!has('fog')||event.stage===r.stage)),canUndo:i===0 && !!r.undo?.length,code:r.code,v:r.v,me:i,phase:r.phase,stage:r.stage,mods:r.mods,wins:r.wins,losses:r.losses,success:r.success,ready:r.ready||[],history:has('fog')&&!end?[]:r.history||[],occupied:(r.chips||[]).filter(Boolean),board:board.map(c=>has('suitfog')&&!end?label(c).slice(0,-1)+'？':label(c)),players:r.players.map((p,j)=>{
+ return {reward:end?r.reward:null,events:(r.events||[]).filter(event=>end||!has('mute')&&(!has('fog')||event.stage===r.stage)),canUndo:i===0 && !!r.undo?.length,code:r.code,v:r.v,me:i,phase:r.phase,stage:r.stage,mods:r.mods,wins:r.wins,losses:r.losses,success:r.success,ready:r.ready||[],history:has('fog')&&!end?[]:r.history||[],occupied:(r.chips||[]).filter(Boolean),board:board.map(c=>has('suitfog')&&!end?label(c).slice(0,-1)+'？':label(c)),players:r.players.map((p,j)=>{
  const h=r.hands?.[j]||[],[a,b]=h, hints=[];
  if(h.length){for(const [key,text] of Object.entries({suited:'同花色 '+(Math.floor(a/13)===Math.floor(b/13)?'是':'否'),pair:'口袋对子 '+(a%13===b%13?'是':'否'),ace:'持 A '+(h.some(c=>c%13===12)?'是':'否'),gap:'相邻 '+(Math.abs(a%13-b%13)===1?'是':'否'),face:'人像 '+h.filter(c=>c%13>=9&&c%13<=11).length,color:'红牌 '+h.filter(c=>[1,2].includes(Math.floor(c/13))).length}))if(has(key))hints.push(text)}
  const score=end||j===i&&has('oracle')&&board.length>=3&&!has('suitfog')?strength([...h,...board]):null;

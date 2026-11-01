@@ -6,7 +6,21 @@ h1,h2{color:#ffe16a;font-weight:900}small,.picks{color:#ff94b0}.tools{margin:14p
 button,select,input{font:inherit;border-radius:4px}button{background:#ffe16a;color:#241b24;border-color:#574656}
 button.on{background:#fc779c;color:#1d1119}select,input{max-width:100%;background:#312b36;color:#fff4e5;padding:8px}
 button:focus-visible,select:focus-visible{outline:3px solid #fff;outline-offset:2px}
-</style><main><header><a href="/" style="color:#ffe16a">← 游戏大厅</a><br><small>THE NIGHT SHIFT　/　合作推理</small><h1>桌边行动台</h1>选择行动，召集队友。</header><div id="err" role="status"></div><div id="table"></div><details><summary>桌边规则</summary>3–6 人，每人两张底牌。四轮公共牌依次为 0、3、4、5 张。数字表示相对牌力强度，1 最弱，数字越大越强；可拿走别人的筹码，原持有人回到待选。不得透露牌面或暗示具体实力。原版在全员各持一枚时结束本轮。本桌保留全员确认：拿齐后仍可调整，改筹会清除确认，全员确认后才推进。白、黄、橙、红四轮各用一组新筹码，前三轮只作线索，最后只按红色筹码验牌。修正项是本作自定义玩法。最终按河牌轮筹码顺序摊牌，七张中选最佳五张，同牌型比踢脚，完全平手可互换。排对一局开一座金库，排错响一次警报，五局三胜提前结束。 <a style="color:#ffe16a" href="https://www.thamesandkosmos.com/manuals/full/683887_TheGang_Manual-Web_051624.pdf" target="_blank" rel="noopener">原版规则书</a></details></main><script type="module">
+#scene:not([hidden]){position:fixed;inset:0;background:#15101dec;z-index:20;display:grid;place-items:center;padding:16px}
+#scene article{width:min(400px,100%);border:3px solid currentColor;background:#24202a;padding:24px;box-shadow:8px 8px #08070a}
+#scene h2{font-size:clamp(30px,7vw,52px);color:inherit}.emblem{font-size:44px;letter-spacing:.15em}
+#scene[data-kind=vault]{color:#ffd764}#scene[data-kind=alarm]{color:#ff7190}#scene[data-kind=win]{color:#8cf8d7}#scene[data-kind=loss]{color:#cca4ff}
+@media(prefers-reduced-motion:no-preference){
+#scene[data-kind=vault] .emblem{animation:unlock .7s ease-out}
+#scene[data-kind=alarm] article{animation:siren .4s ease-out}
+#scene[data-kind=win] .emblem{animation:salute 1s ease-out}
+#scene[data-kind=loss] .emblem{animation:blackout 1s ease-out}
+@keyframes unlock{from{letter-spacing:0;transform:scaleX(.5)}}
+@keyframes siren{25%{transform:translateX(-6px)}65%{transform:translateX(4px)}}
+@keyframes salute{from{transform:translateY(22px);opacity:.2}}
+@keyframes blackout{from{clip-path:inset(0 95% 0 0)}}
+}
+</style><main><header><a href="/" style="color:#ffe16a">← 游戏大厅</a><br><small>THE NIGHT SHIFT　/　合作推理</small><h1>桌边行动台</h1>选择行动，召集队友。</header><button id="audio-opt" type="button">音效：开</button><aside id="scene" hidden aria-live="polite"><article><small id="scene-label"></small><div class="emblem" aria-hidden="true"></div><h2></h2><p></p><button id="advance-scene">继续</button></article></aside><div id="err" role="status"></div><div id="table"></div><details><summary>桌边规则</summary>3–6 人，每人两张底牌。四轮公共牌依次为 0、3、4、5 张。数字表示相对牌力强度，1 最弱，数字越大越强；可拿走别人的筹码，原持有人回到待选。不得透露牌面或暗示具体实力。原版在全员各持一枚时结束本轮。本桌保留全员确认：拿齐后仍可调整，改筹会清除确认，全员确认后才推进。白、黄、橙、红四轮各用一组新筹码，前三轮只作线索，最后只按红色筹码验牌。修正项是本作自定义玩法。最终按河牌轮筹码顺序摊牌，七张中选最佳五张，同牌型比踢脚，完全平手可互换。排对一局开一座金库，排错响一次警报，五局三胜提前结束。 <a style="color:#ffe16a" href="https://www.thamesandkosmos.com/manuals/full/683887_TheGang_Manual-Web_051624.pdf" target="_blank" rel="noopener">原版规则书</a></details></main><script type="module">
 const table=document.querySelector('#table'),err=document.querySelector('#err'),mods=await(await fetch('/gang/mods')).json();
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cards=h=>h.map(c=>'<b class="card" style="color:'+(/[♥♦]/.test(c)?'#9c2443':'#21221c')+'">'+esc(c)+'</b>').join('');
@@ -26,6 +40,43 @@ async function shareRoom(){
  if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(url.href);err.textContent='已复制房间邀请';return}catch{}}
  prompt('复制房间邀请链接',url.href);
 }
+const scene=document.querySelector('#scene'), audioButton=document.querySelector('#audio-opt');
+let audio, muted=localStorage.getItem('gang-muted')==='yes', queue=[], sceneTimer;
+function audioLabel(){audioButton.textContent='音效：'+(muted?'关':'开')}
+audioLabel();
+audioButton.onclick=()=>{muted=!muted;localStorage.setItem('gang-muted',muted?'yes':'no');audioLabel();if(!muted)unlockAudio()};
+function unlockAudio(){if(muted)return;try{audio??=new AudioContext();audio.resume().catch(()=>{})}catch{}}
+document.addEventListener('pointerdown',unlockAudio,{passive:true});
+document.addEventListener('keydown',unlockAudio);
+const cues={
+ vault:['金库开启','VAULT / OPEN','▐ ◈ ▌',[330,494,660]],
+ alarm:['警报响起','ALARM / TRIPPED','⚠ ━ ⚠',[760,460,760,460]],
+ win:['全队凯旋','CAMPAIGN / CLEAR','★ ★ ★',[392,494,587,784]],
+ loss:['行动终止','CAMPAIGN / CLOSED','▰ ▱ ▱',[330,262,196,131]]
+};
+function nextScene(){
+ clearTimeout(sceneTimer);
+ const item=queue.shift();if(!item){scene.hidden=true;return}
+ const [kind,text]=item,[title,label,art,notes]=cues[kind];
+ scene.dataset.kind=kind;scene.hidden=false;scene.querySelector('h2').textContent=title;
+ scene.querySelector('small').textContent=label;scene.querySelector('.emblem').textContent=art;scene.querySelector('p').textContent=text;
+ if(!muted&&audio?.state==='running')notes.forEach((freq,i)=>{
+ const tone=audio.createOscillator(),gain=audio.createGain(),at=audio.currentTime+i*.18;
+ tone.frequency.value=freq;tone.type=kind==='alarm'?'triangle':'sine';
+ gain.gain.setValueAtTime(.001,at);gain.gain.exponentialRampToValueAtTime(.07,at+.015);gain.gain.exponentialRampToValueAtTime(.001,at+.17);
+ tone.connect(gain).connect(audio.destination);tone.start(at);tone.stop(at+.18)
+ });
+ sceneTimer=setTimeout(nextScene,3000)
+}
+document.querySelector('#advance-scene').onclick=nextScene;
+function rewardText(r){return !r.reward?'':r.reward.added?'新增'+r.reward.group+' · '+mods[r.reward.added][1]:r.reward.group+'已全部启用，本局不重复抽取'}
+function scenes(r){
+ if(r.phase!=='result'){if(!scene.hidden){queue=[];nextScene()}return}
+ const key=r.code+'-'+r.v;if(sessionStorage.getItem('gang-scene')===key)return;
+ sessionStorage.setItem('gang-scene',key);queue=[[r.success?'vault':'alarm',rewardText(r)]];
+ if(Math.max(r.wins,r.losses)===3)queue.push([r.wins===3?'win':'loss','最终战绩：'+r.wins+' 胜 '+r.losses+' 败']);
+ nextScene()
+}
 function render(){let r=state,host=r.me===0,me=r.players[r.me],html='<section><small>房间 '+r.code+'　/　'+r.players.length+' 人</small>'+btn('share','分享当前房间')+'<h2>金库 '+r.wins+'　·　警报 '+r.losses+'</h2>'+r.players.map(p=>esc(p.name)).join(' · ')+'</section>';
 if(r.phase==='lobby'){html+='<section><h2>行动简报</h2>不选修正即为基础玩法。已选 '+r.mods.length+' 项。'+(host?'<div class="tools">'+['增益','减益'].map((group,i)=>btn('random',i?'随机 Debuff':'随机 Buff',group,Object.keys(mods).some(k=>mods[k][0]===group&&!r.mods.includes(k))?'':'disabled')).join('')+btn('undo','↶ 撤销上一个修正','',r.canUndo?'':'disabled')+'</div>':'')+'<p class="picks">'+(r.mods.map(k=>mods[k][1]).join(' · ')||'当前无修正')+'</p>'+['增益','减益'].map(group=>'<h3>'+group+'</h3>'+Object.entries(mods).filter(([,m])=>m[0]===group).map(([id,m])=>btn('mod',(r.mods.includes(id)?'✓ ':'')+m[1]+' · '+m[2],id,(host?'':'disabled')+(r.mods.includes(id)?' class="on"':''))).join('')).join('')+(host?btn('start','开始第一局','',r.players.length<3?'disabled':''):'等待房主开局')+'</section>'}
 else {const end=r.phase==='result';html+='<section><small>'+phases[r.stage]+' / '+(r.mods.map(k=>mods[k][1]).join('、')||'基础玩法')+'</small><h2>公共牌</h2>'+(cards(r.board)||'尚未亮牌')+'</section>';
@@ -34,7 +85,8 @@ html+='<section><h2>'+(end?(r.success?'金库开启':'警报触发'):'队伍情�
 html+='<section><h3>队伍情报 · 牌力筹码日志</h3>'+([...r.events].reverse().map(ev=>'<p>'+phases[ev.stage]+' · '+esc(ev.text)+'</p>').join('')||'暂无可见记录')+'</section>';
 if(r.history.length)html+='<details><summary>历轮筹码</summary>'+r.history.map((row,j)=>'<p>'+phases[j]+'：'+row.map((v,k)=>esc(r.players[k].name)+' #'+v).join(' · ')+'</p>').join('')+'</details>';
 if(end){const over=Math.max(r.wins,r.losses)===3;html+='<section><h2>'+(over?(r.wins===3?'团队胜利':'行动失败'):'本局结算')+'</h2>'+(host?btn(over?'again':'next',over?'再开一场':'下一局'):'等待房主')+'</section>'}}
-table.innerHTML=html}
+if(r.phase!=='lobby')html+='<section><h2>当前全部修正</h2>'+(r.phase==='result'?'<p>'+esc(rewardText(r))+'</p>':'')+['增益','减益'].map(group=>'<h3>'+group+'</h3>'+(r.mods.filter(k=>mods[k][0]===group).map(k=>'<p><b>'+mods[k][1]+'</b> · '+mods[k][2]+'</p>').join('')||'无')).join('')+'</section>';
+table.innerHTML=html;scenes(r)}
 async function send(cmd,value){if(busy)return;busy=true;try{const body={...session,cmd,value,v:state?.v};if(['create','join'].includes(cmd)){body.name=document.querySelector('#name').value;body.code=document.querySelector('#code').value}
 const result=await(await fetch('/gang/room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();if(result.error){if(cmd==='read'&&['房间不存在','席位无效'].includes(result.error)){session=null;sessionStorage.removeItem('gang');home()}throw Error(result.error)}
 if(result.token){session={token:result.token,code:result.code};sessionStorage.setItem('gang',JSON.stringify(session))}
