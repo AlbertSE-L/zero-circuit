@@ -66,8 +66,18 @@ button.secondary, input, select { background: #352d3b; color: #fff8eb; }
 .pair-stamp svg {display:block;width:100%;height:auto}
 .pair-stamp span {display:block;padding:3px 10px;font-size:clamp(14px,3vw,18px)}
 body {isolation:isolate;position:relative}
-body::before {content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background:radial-gradient(ellipse at 82% 20%,#d85c91,transparent 58%);opacity:.04}
-@media(prefers-reduced-motion:no-preference){
-  body::before {animation:ambient-ink 10s ease-in-out infinite alternate}
-  @keyframes ambient-ink {from{opacity:.025}to{opacity:.075}}
+/* Rim light stays visible even where the opaque board covers the backdrop. */
+body::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:4;
+  background:radial-gradient(ellipse at 100% 18%,#ff267a 0,transparent 33%),
+             radial-gradient(ellipse at 0 83%,#ec2477 0,transparent 26%);
+  box-shadow:inset 0 0 18px #ff357a;
+  opacity:.12;
+}
+@media(prefers-reduced-motion:no-preference) {
+  body::before {animation:rim-beat 2s ease-out infinite}
+  body[data-downbeat="a"]::before {animation:rim-beat 2s ease-out both}
+  body[data-downbeat="b"]::before {animation:rim-accent 2s ease-out both}
+  @keyframes rim-beat {0%{opacity:.31} 24%{opacity:.17} 65%,100%{opacity:.065}}
+  @keyframes rim-accent {0%{opacity:.31} 24%{opacity:.17} 65%,100%{opacity:.065}}
 }

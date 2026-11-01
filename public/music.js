@@ -1,18 +1,23 @@
 // Original looping motifs, synthesized locally without audio downloads.
 const scores = {
-  urgent: [0.16, 'sawtooth', [45, 52, 45, 53, 45, 55, 52, 50]],
-  relaxed: [0.60, 'sine', [60, 67, 69, 64, 62, 67, 64, 0]],
-  joyful: [0.28, 'triangle', [60, 64, 67, 72, 69, 67, 64, 67]]
+  urgent: [0.125, 'sawtooth', [45, 52, 45, 53, 45, 55, 52, 50]],
+  relaxed: [0.5, 'sine', [60, 67, 69, 64, 62, 67, 64, 0]],
+  joyful: [0.25, 'triangle', [60, 64, 67, 72, 69, 67, 64, 67]]
 };
-let context, timer;
+let context, timer, playback = 0;
 export async function play(mode) {
+  const generation = ++playback;
   clearInterval(timer);
+  delete document.body.dataset.downbeat;
   if (!scores[mode]) return;
   context ??= new AudioContext();
   await context.resume();
+  if (generation !== playback) return;
   const [beat, waveform, melody] = scores[mode];
   let step = 0;
   function note() {
+    const downbeat = step % (2 / beat) === 0;
+    if (downbeat) document.body.dataset.downbeat = document.body.dataset.downbeat === "a" ? "b" : "a";
     const pitch = melody[step++ % melody.length];
     if (!pitch) return;
     const oscillator = context.createOscillator();
@@ -21,7 +26,7 @@ export async function play(mode) {
     oscillator.type = waveform;
     oscillator.frequency.value = 440 * 2 ** ((pitch - 69) / 12);
     gain.gain.setValueAtTime(0.001, now);
-    gain.gain.exponentialRampToValueAtTime(0.045, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(downbeat ? 0.055 : 0.045, now + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.001, now + beat * 0.94);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start(now);
