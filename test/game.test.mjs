@@ -22,7 +22,7 @@ test('数字配对、错误提示、红线失败及回合限制',()=>{
 });
 test('绝缘、初始提示、私人探测及一次性技能',()=>{
   let {players,game}=fixture();applyAction(game,players,'b',{type:'beacon',ownId:'b3'});assert.equal(game.turn,0);assert.equal(game.moves,0);assert.equal(players[1].hand[1].hint,'3');assert.throws(()=>applyAction(game,players,'b',{type:'beacon',ownId:'b1'}));
-  applyAction(game,players,'a',{type:'skill',targetId:'red'});assert.equal(players[0].notes[0].kind,'red');assert.equal(players[0].skillUsed,true);
+  applyAction(game,players,'a',{type:'skill',targetId:'red'});assert.equal(players[0].notes[0].kind,'red');assert.match(players[0].notes[0].text,/红色危险线/);assert.equal(players[0].skillUsed,true);
   const room={players,game,code:'123456',hostId:'a',version:1};const bView=playerView(room,'b');assert.equal(bView.notes.length,0);assert.equal(bView.players[0].hand[0].value,undefined);assert.equal(bView.players[0].hand[0].kind,undefined);assert.equal(JSON.stringify(bView).includes('tileId'),false);
   applyAction(game,players,'b',{type:'skill'});assert.equal(game.shield,true);
   applyAction(game,players,'a',{type:'pair',ownId:'a1',targetId:'b3'});assert.equal(game.fuse,3);assert.equal(game.shield,false);

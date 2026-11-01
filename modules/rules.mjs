@@ -59,5 +59,5 @@ export function playerView(room,viewerId) {
   const viewer=room.players.find(p=>p.id===viewerId);if(!viewer)throw new Error('无权访问房间');
   return {code:room.code,version:room.version,hostId:room.hostId,capacity:room.capacity,challengeId:room.challengeId,viewerId,
     players:room.players.map(p=>({id:p.id,name:p.name,skill:p.skill,skillUsed:p.skillUsed,beaconUsed:p.beaconUsed,hand:(p.hand||[]).map(t=>({id:t.id,slot:t.slot,removed:t.removed,hint:t.hint,...(p.id===viewerId||t.removed?{kind:t.kind,value:t.value}:{})}))})),
-    notes:viewer.notes||[],game:room.game?{...room.game}:null};
+    notes:(viewer.notes||[]).map(note=>note.kind && note.text.endsWith('是undefined。') ? {...note,text:note.text.replace(/undefined。$/, {blue:'蓝色数字线',amber:'琥珀线',red:'红色危险线'}[note.kind]+'。')} : note),game:room.game?{...room.game}:null};
 }

@@ -3,20 +3,7 @@ export default [
   {id:'spectrum',name:'光谱探针',description:'私下探测一条队友未拆线路的颜色。消耗本次行动。',target:true,
     apply({game,player,target}) {
       if(!target || target.owner===player.id || target.removed)throw new Error('请选择一条队友尚未拆除的线路');
-      const kind={blue:'蓝色数字线',amber:'琥珀线',red:'红色危险线'}[target.kind  ,{id:'phase',name:'相位采样',description:'私下获知选定线路的蓝线数字奇偶，特殊线只显示非数字。',target:true,
-    apply({player,target,game}) {
-      if(!target||target.owner===player.id||target.removed) throw new Error('请选择队友未拆线路');
-      const hint=target.kind==='blue'?(target.value%2?'奇数':'偶数'):'非数字';
-      player.notes.push({text:target.ownerName+' 的 '+target.slot+' 号位：'+hint});
-      game.logs.push(player.name+' 完成相位采样。');
-    }},
-  {id:'relay',name:'信标复位',description:'重新启用自己已使用的公开提示。',target:false,
-    apply({player,game}) {
-      if(!player.beaconUsed) throw new Error('请先使用初始公开提示');
-      player.beaconUsed=false;
-      game.logs.push(player.name+' 的信标已经复位。');
-    }}
-];
+      const kind={blue:'蓝色数字线',amber:'琥珀线',red:'红色危险线'}[target.kind];
       player.notes.push({text:`光谱探针：${target.ownerName} 的 ${target.slot} 号位是${kind}。`,tileId:target.id,kind:target.kind});
       game.logs.push(`${player.name} 使用了光谱探针，结果仅本人可见。`);
     }},
