@@ -23,7 +23,7 @@ export async function handleGang(req,res,path){
  if(path==='/gang/'&&req.method==='GET'){res.setHeader('Content-Type','text/html;charset=utf-8');return res.end(html)}
  if(path==='/gang/mods')return json(mods);
  if(path!=='/gang/room'||req.method!=='POST')return json({error:'页面不存在'},404);
- if(req.headers.origin&&req.headers.origin!=='http://'+req.headers.host)throw Error('跨站请求');
+ if(req.headers.origin&&req.headers.origin!==(process.env.RENDER_EXTERNAL_URL || 'http://'+req.headers.host))throw Error('跨站请求');
  let raw='';for await(const part of req){raw+=part;if(raw.length>4096)throw Error('请求过大')}
  const b=JSON.parse(raw), player=()=>{const name=String(b.name||'').trim().slice(0,16);if(!name)throw Error('请输入昵称');return {name,token:randomBytes(24).toString('hex')}};
  let r=rooms.get(b.code),i=r?.players.findIndex(p=>p.token===b.token)??-1;
