@@ -65,13 +65,36 @@ function showPairResult(room, targetId) {
   banner.replaceChildren(stamp);
   feedbackTimer = setTimeout(() => banner.replaceChildren(), 2600);
 }
-async function mutate(action,body={}){if(!session||!view)return;const next=await api(`/rooms/${view.code}/${action}`,'POST',{...body,version:view.version});view=next;ownId=targetId=null;render();if(body.action?.type==="pair")showPairResult(next,body.action.targetId);}
+async function mutate(action,body={}){if(!session||!view)return;const next=await api(`/rooms/${view.code}/${action}`,'POST',{...body,version:view.version});view=next;ownId=targetId=null;render();if(body.action?.type==="pair" && next.game?.status!=="won")showPairResult(next,body.action.targetId);}
 function forget(){session=view=null;revealed=privateShown=false;localStorage.removeItem(storageKey);history.replaceState(null,'','/');home();}
 function me(){return view.players.find(p=>p.id===view.viewerId);}
 function button(id,fn){const el=document.getElementById(id);if(el)el.onclick=ev=>perform(ev,fn);}
 function header(challenge){return `<div class="room-head"><div><div class="eyebrow">${e(challenge.tag)} / ${e(challenge.name)}</div><h1>行动编号 <span class="room-code">${e(view.code)}</span></h1><span class="connection">自动重连 · 进度已保存至主持电脑</span></div><div class="actions"><button id="copy-invite" class="ghost">复制邀请</button><button id="switch-room" class="secondary">切换房间</button></div></div>`;}
 function bindCommon(){button('copy-invite',async()=>{const address=(location.hostname==='localhost'||location.hostname==='127.0.0.1')?catalog.addresses[0]?.url:location.origin;if(!address)throw new Error('未找到局域网地址，请查看启动窗口');const url=address+'/?room='+view.code;if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);notice.textContent='邀请链接已复制：'+url;}else{notice.textContent='请长按复制此邀请链接：'+url;}});button('switch-room',async()=>{if(confirm('离开当前界面？你的席位仍保留；重新加入原房间需要保留原浏览器凭据。')){const old=session;session=null;view=null;clearInterval(poll);history.replaceState(null,'','/');home();const resume=document.createElement('button');resume.className='ghost';resume.textContent='恢复上一个房间 '+old.code;resume.onclick=()=>{session=old;refresh();poll=setInterval(refresh,2200);};root.prepend(resume);}});}
-function render(){const c=catalog.challenges.find(c=>c.id===view.challengeId),host=view.hostId===view.viewerId;syncMusic(host);const toggle=host?'<button id="referee" class="ghost">'+(view.refereeActive?'退出超级玩家':'成为超级玩家')+'</button>':'';
+const rimToggle = document.querySelector('#rim-toggle');
+function setRim(off) {
+  document.body.classList.toggle('rim-off', off);
+  rimToggle.textContent = off ? '开启背景闪烁' : '关闭背景闪烁';
+}
+setRim(localStorage.getItem('zero-circuit-rim') === 'off');
+rimToggle.onclick = () => {
+  const off = !document.body.classList.contains('rim-off');
+  setRim(off);
+  localStorage.setItem('zero-circuit-rim', off ? 'off' : 'on');
+};
+const victory = document.querySelector('#victory');
+let lastEnding = '', victoryTimer;
+function hideVictory() { clearTimeout(victoryTimer); victory.hidden = true; }
+document.querySelector('#skip-victory').onclick = hideVictory;
+function syncVictory() {
+  if (view.game?.status !== 'won') { lastEnding = ''; hideVictory(); return; }
+  const key = view.code + ':' + view.viewerId;
+  if (lastEnding === key) return;
+  lastEnding = key;
+  victory.hidden = false;
+  victoryTimer = setTimeout(hideVictory, 4200);
+}
+function render(){syncVictory();const c=catalog.challenges.find(c=>c.id===view.challengeId),host=view.hostId===view.viewerId;syncMusic(host);const toggle=host?'<button id="referee" class="ghost">'+(view.refereeActive?'退出超级玩家':'成为超级玩家')+'</button>':'';
 const log=view.debug?'<section class="panel"><h2>法官日志</h2><p>最近 200 次成功行动，最新在前。升级前的私人探测保留在下方。</p><ol>'+view.debug.events.slice().reverse().map(event=>'<li>'+e(new Date(event.time).toLocaleTimeString())+' · '+e(event.text)+'</li>').join('')+'</ol><h3>私人探测记录</h3><ul>'+view.debug.notes.map(note=>'<li>'+e(note)+'</li>').join('')+'</ul></section>':'';
 root.innerHTML=header(c)+toggle+(view.refereeActive?'<p class="pill">房主已开启超级玩家模式，可查看私人探测结果</p>':'')+log+(view.game?board(c,host):lobby(c,host));bindCommon();button('referee',async()=>{if(view.refereeActive||confirm('开启后你将看到玩家秘密，所有人都能看到模式提示。继续？'))await mutate('referee',{enabled:!view.refereeActive});});if(view.game)bindBoard(host);else bindLobby(host);}
 function lobby(c,host){const joinBase=(location.hostname==='localhost'||location.hostname==='127.0.0.1')?catalog.addresses[0]?.url:location.origin;
