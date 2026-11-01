@@ -30,6 +30,16 @@ export function strength(cards){
  const kick=straight&&[4,8].includes(cat)?[straight]:groups;
  return [0,1,2,3,4].reduce((n,i)=>n*15+(kick[i]||0),cat)
 }
+export function bestFive(cards){
+ let score=-1, best=[];
+ for(let a=0;a<cards.length-4;a++)for(let b=a+1;b<cards.length-3;b++)
+ for(let c=b+1;c<cards.length-2;c++)for(let d=c+1;d<cards.length-1;d++)
+ for(let e=d+1;e<cards.length;e++){
+   const five=[cards[a],cards[b],cards[c],cards[d],cards[e]],candidate=strength(five);
+   if(candidate>score){score=candidate;best=five}
+ }
+ return best.sort((a,b)=>b%13-a%13).map(label)
+}
 export function deal(r){
  const deck=Array.from({length:52},(_,i)=>i);
  for(let i=51;i>0;i--){const j=randomInt(i+1);[deck[i],deck[j]]=[deck[j],deck[i]]}
@@ -72,6 +82,6 @@ export function view(r,i){
  const h=r.hands?.[j]||[],[a,b]=h, hints=[];
  if(h.length){for(const [key,text] of Object.entries({suited:'同花色 '+(Math.floor(a/13)===Math.floor(b/13)?'是':'否'),pair:'口袋对子 '+(a%13===b%13?'是':'否'),ace:'持 A '+(h.some(c=>c%13===12)?'是':'否'),gap:'相邻 '+(Math.abs(a%13-b%13)===1?'是':'否'),face:'人像 '+h.filter(c=>c%13>=9&&c%13<=11).length,color:'红牌 '+h.filter(c=>[1,2].includes(Math.floor(c/13))).length}))if(has(key))hints.push(text)}
  const score=end||j===i&&has('oracle')&&board.length>=3&&!has('suitfog')?strength([...h,...board]):null;
- return {name:p.name,chip:!end&&has('mute')&&i!==j?null:r.chips?.[j],hand:end||j===i?h.slice(0,!end&&has('late')&&r.stage===0?1:2).map(label):[],hints,category:score===null?'':types[Math.floor(score/15**5)],score:end?score:null}
+ return {name:p.name,chip:!end&&has('mute')&&i!==j?null:r.chips?.[j],hand:end||j===i?h.slice(0,!end&&has('late')&&r.stage===0?1:2).map(label):[],hints,category:score===null?'':types[Math.floor(score/15**5)],score:end?score:null,best:end?bestFive([...h,...board]):undefined}
  })}
 }

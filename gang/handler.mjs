@@ -31,7 +31,7 @@ export async function handleGang(req,res,path){
  if(b.cmd==='create'){let code;do{code=String(randomInt(100000,1000000))}while(rooms.has(code));r={code,v:0,players:[player()],phase:'lobby',wins:0,losses:0,mods:[]};i=0}
  else if(!r)throw Error('房间不存在');
  else if(b.cmd==='join'){if(r.phase!=='lobby'||r.players.length>=6)throw Error('无法入座');const p=player();if(r.players.some(x=>x.name===p.name))throw Error('昵称重复');i=r.players.push(p)-1}
- else {if(i<0)throw Error('席位无效');if(b.cmd==='read')return json(view(r,i));if(b.v!==r.v)throw Error('桌面刚有变化，请重试');
+ else {if(i<0)throw Error('席位无效');if(b.cmd==='read'){if(b.v===r.v){res.writeHead(204,{'Cache-Control':'no-store'});return res.end()}return json(view(r,i))}if(b.v!==r.v)throw Error('桌面刚有变化，请重试');
  if(['start','next','mod','random','undo','again'].includes(b.cmd)&&i!==0)throw Error('需要房主操作');
  if(b.cmd==='undo'){if(r.phase!=='lobby'||!r.undo?.length)throw Error('没有可撤销修正');r.mods=r.undo.pop()}
  else if(['mod','random'].includes(b.cmd)){

@@ -48,7 +48,7 @@ export function createServer({dataDir=new URL('./.data/',base)}={}) {
         if(r.players.length>=r.capacity)throw new Error('房间已满');const name=nameOf(body.name);if(r.players.some(p=>p.name===name))throw new Error('昵称已被使用');const p={id:id(),token:secret(),name};r.players.push(p);r.version++;persist(r);return send(res,201,{token:p.token,room:playerView(r,p.id)});
       }
       const auth=req.headers.authorization?.replace(/^Bearer /,'');const p=r.players.find(p=>p.token===auth);if(!p)return send(res,403,{error:'身份凭据失效，请重新加入'});
-      if(req.method==='GET'&&!action)return send(res,200,playerView(r,p.id));
+      if(req.method==='GET'&&!action){if(url.searchParams.get('since')===String(r.version)){res.writeHead(204,{'Cache-Control':'no-store'});return res.end()}return send(res,200,playerView(r,p.id))}
       if(req.method!=='POST')return send(res,405,{error:'不支持此方法'});
       if(body.version!==r.version)return send(res,409,{error:'房间状态刚刚变化，已刷新，请确认后重试'});
       if(action!=='action'&&p.id!==r.hostId)return send(res,403,{error:'只有房主可以进行此操作'});

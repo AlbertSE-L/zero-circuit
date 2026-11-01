@@ -24,7 +24,7 @@ button:focus-visible,select:focus-visible{outline:3px solid #fff;outline-offset:
 const table=document.querySelector('#table'),err=document.querySelector('#err'),mods=await(await fetch('/gang/mods')).json();
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cards=h=>h.map(c=>'<b class="card" style="color:'+(/[♥♦]/.test(c)?'#9c2443':'#21221c')+'">'+esc(c)+'</b>').join('');
-let state,session=JSON.parse(sessionStorage.getItem('gang')||'null'),busy=false,show=false;
+let state,session=JSON.parse(sessionStorage.getItem('gang')||'null'),busy=false,reading=false,show=false;
 const invitation=new URLSearchParams(location.search).get('room');
 if(invitation && session?.code!==invitation) session=null;
 const phases=['白 · 底牌','黄 · 翻牌','橙 · 转牌','红 · 河牌'];
@@ -77,22 +77,48 @@ function scenes(r){
  if(Math.max(r.wins,r.losses)===3)queue.push([r.wins===3?'win':'loss','最终战绩：'+r.wins+' 胜 '+r.losses+' 败']);
  nextScene()
 }
+function chipTable(r){
+ return r.players.map((_,j)=>{
+   const n=j+1, seat=r.players.findIndex(p=>p.chip===n), own=seat===r.me, taken=r.occupied.includes(n);
+   const owner=own?'我':seat>=0?esc(r.players[seat].name):taken?'已占用':'空闲';
+   const blocked=own||taken&&(r.mods.includes('lock')||r.mods.includes('fixed'))||r.mods.includes('fixed')&&r.players[r.me].chip;
+   return btn('chip',(taken&&!own&&!blocked?'抢 ':'')+n+' · '+owner,n,(blocked?'disabled ':'')+'class="chip '+(own?'on':'')+'"')
+ }).join('')
+}
+function verdict(players){
+ const order=[...players].sort((a,b)=>a.chip-b.chip);
+ const index=order.findIndex((p,i)=>i && order[i-1].score>p.score);
+ let reason='筹码顺序正确。';
+ if(index>0){
+   const high=order[index-1],low=order[index];
+   let why=high.category+' 强于 '+low.category;
+   if(high.category===low.category){
+     const digits=n=>[4,3,2,1,0].map(k=>Math.floor(n/15**k)%15);
+     const a=digits(high.score),b=digits(low.score),k=a.findIndex((v,i)=>v!==b[i]);
+     const face=n=>({11:'J',12:'Q',13:'K',14:'A'}[n]||n);
+     why='同为'+high.category+'，第 '+(k+1)+' 项比较点数 '+face(a[k])+' 大于 '+face(b[k]);
+   }
+   reason='第一处倒置：'+high.chip+' 号 '+esc(high.name)+' 比 '+low.chip+' 号 '+esc(low.name)+' 强。'+why+'。';
+ }
+ const sorted=[...players].sort((a,b)=>a.score-b.score);
+ return reason+'<br>实际从弱到强：'+sorted.map((p,i)=>(i?(p.score===sorted[i-1].score?' = ':' → '):'')+esc(p.name)).join('')
+}
 function render(){let r=state,host=r.me===0,me=r.players[r.me],html='<section><small>房间 '+r.code+'　/　'+r.players.length+' 人</small>'+btn('share','分享当前房间')+'<h2>金库 '+r.wins+'　·　警报 '+r.losses+'</h2>'+r.players.map(p=>esc(p.name)).join(' · ')+'</section>';
 if(r.phase==='lobby'){html+='<section><h2>行动简报</h2>不选修正即为基础玩法。已选 '+r.mods.length+' 项。'+(host?'<div class="tools">'+['增益','减益'].map((group,i)=>btn('random',i?'随机 Debuff':'随机 Buff',group,Object.keys(mods).some(k=>mods[k][0]===group&&!r.mods.includes(k))?'':'disabled')).join('')+btn('undo','↶ 撤销上一个修正','',r.canUndo?'':'disabled')+'</div>':'')+'<p class="picks">'+(r.mods.map(k=>mods[k][1]).join(' · ')||'当前无修正')+'</p>'+['增益','减益'].map(group=>'<h3>'+group+'</h3>'+Object.entries(mods).filter(([,m])=>m[0]===group).map(([id,m])=>btn('mod',(r.mods.includes(id)?'✓ ':'')+m[1]+' · '+m[2],id,(host?'':'disabled')+(r.mods.includes(id)?' class="on"':''))).join('')).join('')+(host?btn('start','开始第一局','',r.players.length<3?'disabled':''):'等待房主开局')+'</section>'}
 else {const end=r.phase==='result';html+='<section><small>'+phases[r.stage]+' / '+(r.mods.map(k=>mods[k][1]).join('、')||'基础玩法')+'</small><h2>公共牌</h2>'+(cards(r.board)||'尚未亮牌')+'</section>';
-if(!end)html+='<section><h2>我的底牌 · '+esc(me.name)+'</h2>'+btn('show',show?'盖住':'查看')+(show?cards(me.hand)+' '+esc(me.category):'')+'<h3>牌力强度</h3><small>1 最弱，数字越大牌力越强。</small><br>'+r.players.map((p,j)=>btn('chip',String(j+1),j+1,'class="chip '+(me.chip===j+1?'on':'')+'"')).join('')+btn('chip','退回',0)+'<p>已占用 '+r.occupied.join('、')+' · 我的牌力强度 '+(me.chip||'待选')+'</p>'+btn('ready',r.ready.includes(r.me)?'已确认':'确认本轮牌力强度','',r.occupied.length<r.players.length||r.ready.includes(r.me)?'disabled':'')+' '+r.ready.length+'/'+r.players.length+'</section>';
-html+='<section><h2>'+(end?(r.success?'金库开启':'警报触发'):'队伍情报')+'</h2>'+(end?[...r.players].sort((a,b)=>a.chip-b.chip):r.players).map(p=>'<p><strong>'+esc(p.name)+'</strong> · '+(p.chip?'第 '+p.chip+' 位':'待定')+' '+(end?cards(p.hand)+' '+p.category:'')+' '+p.hints.join(' / ')+'</p>').join('')+(end?'实际从弱到强：'+[...r.players].sort((a,b)=>a.score-b.score).map(p=>esc(p.name)).join(' → '):'')+'</section>';
+if(!end)html+='<section><h2>我的底牌 · '+esc(me.name)+'</h2>'+btn('show',show?'盖住':'查看')+(show?cards(me.hand)+' '+esc(me.category):'')+'<h3>牌力强度</h3><small>1 最弱，数字越大牌力越强。</small><br>'+chipTable(r)+btn('chip','退回',0)+'<p>已占用 '+r.occupied.join('、')+' · 我的牌力强度 '+(me.chip||'待选')+'</p>'+btn('ready',r.ready.includes(r.me)?'已确认':'确认本轮牌力强度','',r.occupied.length<r.players.length||r.ready.includes(r.me)?'disabled':'')+' '+r.ready.length+'/'+r.players.length+'</section>';
+html+='<section><h2>'+(end?(r.success?'金库开启':'警报触发'):'队伍情报')+'</h2>'+(end?[...r.players].sort((a,b)=>a.chip-b.chip):r.players).map(p=>'<p><strong>'+esc(p.name)+'</strong> · '+(p.chip?'第 '+p.chip+' 位':'待定')+' '+(end?cards(p.hand)+' '+p.category+'<br>最佳五张 '+cards(p.best):r.ready.includes(r.players.indexOf(p))?'✓ 已确认':r.mods.includes('mute')?'待确认':p.chip?'待确认':'尚无筹码')+' '+p.hints.join(' / ')+'</p>').join('')+(end?verdict(r.players):'')+'</section>';
 html+='<section><h3>队伍情报 · 牌力筹码日志</h3>'+([...r.events].reverse().map(ev=>'<p>'+phases[ev.stage]+' · '+esc(ev.text)+'</p>').join('')||'暂无可见记录')+'</section>';
 if(r.history.length)html+='<details><summary>历轮筹码</summary>'+r.history.map((row,j)=>'<p>'+phases[j]+'：'+row.map((v,k)=>esc(r.players[k].name)+' #'+v).join(' · ')+'</p>').join('')+'</details>';
 if(end){const over=Math.max(r.wins,r.losses)===3;html+='<section><h2>'+(over?(r.wins===3?'团队胜利':'行动失败'):'本局结算')+'</h2>'+(host?btn(over?'again':'next',over?'再开一场':'下一局'):'等待房主')+'</section>'}}
 if(r.phase!=='lobby')html+='<section><h2>当前全部修正</h2>'+(r.phase==='result'?'<p>'+esc(rewardText(r))+'</p>':'')+['增益','减益'].map(group=>'<h3>'+group+'</h3>'+(r.mods.filter(k=>mods[k][0]===group).map(k=>'<p><b>'+mods[k][1]+'</b> · '+mods[k][2]+'</p>').join('')||'无')).join('')+'</section>';
-table.innerHTML=html;scenes(r)}
-async function send(cmd,value){if(busy)return;busy=true;try{const body={...session,cmd,value,v:state?.v};if(['create','join'].includes(cmd)){body.name=document.querySelector('#name').value;body.code=document.querySelector('#code').value}
-const result=await(await fetch('/gang/room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();if(result.error){if(cmd==='read'&&['房间不存在','席位无效'].includes(result.error)){session=null;sessionStorage.removeItem('gang');home()}throw Error(result.error)}
+const expanded=table.querySelector('details')?.open;const reset=table.dataset.confirmed==='yes' && !r.ready.includes(r.me) && table.dataset.stage===String(r.stage) && r.phase==='play';table.innerHTML=html;if(expanded&&table.querySelector('details'))table.querySelector('details').open=true;if(reset)table.querySelector('.chip')?.parentElement?.insertAdjacentHTML('beforeend','<p>筹码已变更，请重新确认。</p>');table.dataset.confirmed=r.ready.includes(r.me)?'yes':'no';table.dataset.stage=r.stage;scenes(r)}
+async function send(cmd,value){const poll=cmd==='read';if(poll){if(reading||busy)return;reading=true}else{if(busy){err.textContent='正在提交上一步操作';return}busy=true;err.textContent='正在提交…'}try{const body={...session,cmd,value,v:state?.v};if(['create','join'].includes(cmd)){body.name=document.querySelector('#name').value;body.code=document.querySelector('#code').value}
+const response=await fetch('/gang/room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(response.status===204){if(err.dataset.connection){err.textContent='';delete err.dataset.connection}return}const result=await response.json();if(result.error){if(cmd==='read'&&['房间不存在','席位无效'].includes(result.error)){session=null;sessionStorage.removeItem('gang');home()}throw Error(result.error)}
 if(result.token){session={token:result.token,code:result.code};sessionStorage.setItem('gang',JSON.stringify(session))}
 if(session)localStorage.setItem('gang-last-seat',JSON.stringify(session));
 if(cmd==='read' && err.dataset.connection){err.textContent='';delete err.dataset.connection}
-if(!state||result.v!==state.v){if(state?.phase!==result.phase)show=false;state=result;render()}if(cmd!=='read')err.textContent='';}catch(e){if(e instanceof TypeError && session){err.dataset.connection='retry';err.textContent='连接中断，正在尝试恢复原座位…'}else err.textContent=e.message}finally{busy=false}}
+if(!state||result.v>state.v){if(state?.phase!==result.phase)show=false;state=result;render()}if(cmd!=='read')err.textContent='';}catch(e){if(e instanceof TypeError && session){err.dataset.connection='retry';err.textContent='连接中断，正在尝试恢复原座位…'}else err.textContent=e.message}finally{if(poll)reading=false;else busy=false}}
 table.onchange=e=>{if(e.target.id==='game'){const zero=e.target.value==='zero';document.querySelector('#gang-form').hidden=zero;document.querySelector('#open-zero').hidden=!zero}};
 table.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.c==='share'){shareRoom().catch(e=>err.textContent=e.message);return}if(b.dataset.c==='zero'){location.assign('/circuit');return}if(b.dataset.c==='show'){show=!show;render();return}send(b.dataset.c,b.dataset.c==='chip'?Number(b.dataset.value):b.dataset.value)};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&show){show=false;render()}});
@@ -105,5 +131,5 @@ if(!invitation && !session && localStorage.getItem('gang-last-seat')){
  resume.onclick=()=>{session=saved;sessionStorage.setItem('gang',JSON.stringify(saved));send('read')};
  table.prepend(resume);
 }
-if(session)await send('read');setInterval(()=>{if(session)send('read')},1500)
+if(session)await send('read');setInterval(()=>{if(session&&!document.hidden)send('read')},1500);document.addEventListener('visibilitychange',()=>{if(session&&!document.hidden)send('read')})
 </script></html>
