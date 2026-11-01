@@ -37,7 +37,31 @@ function showPairResult(room, targetId) {
   clearTimeout(feedbackTimer);
   const stamp = document.createElement('strong');
   stamp.className = 'pair-stamp ' + state;
-  stamp.textContent = message;
+  // Original ink-panel illustration. Geometry is shared; the connector pose tells the outcome.
+  const poses = {
+    success: ['translate(157 46)', 'M-9 -11 l7 9 16 -19'],
+    warning: ['translate(173 28)', 'M1 -12 v12 m0 5 v1'],
+    failure: ['translate(187 29) rotate(-18)', 'M6 -16 l-12 16 h8 l-8 15']
+  };
+  const [pose, signal] = poses[state];
+  stamp.innerHTML = `<svg viewBox="0 0 320 85" aria-hidden="true" focusable="false">
+    <defs><pattern id="ink-dots" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="currentColor"/></pattern></defs>
+    <path fill="currentColor" opacity=".14" d="M0 10L320 0 300 66 0 85Z"/>
+    <path fill="url(#ink-dots)" opacity=".45" d="M0 14L107 5 60 69 0 80ZM258 7L320 0 320 60 224 79Z"/>
+    <path stroke="currentColor" stroke-width="2" d="M2 31l88-12M12 42l72-8m142 25l84-15m-70 24l75-12"/>
+    <g transform="rotate(-8 160 43)" stroke="#100e16" stroke-width="3" stroke-linejoin="bevel">
+      <path fill="currentColor" d="M0 46h61l17-15h33v18H84L66 62H0Z"/>
+      <path fill="#fff3db" d="M93 26h40l9 8h16v7h-17v7h17v7h-27l-8 7H93Z"/>
+      <path fill="#24202a" d="M99 29h9v30h-9zm14 0h5v30h-5z"/>
+      <g transform="${pose}"><path fill="currentColor" d="M0-17h34l9 9h25l20-12h75v13H92L72 6H43l-9 10H0Z"/>
+      <path fill="#24202a" d="M5-11h7v20H5zm12 0h5v20h-5z"/></g>
+    </g>
+    <g transform="translate(158 22)"><path fill="#17141c" stroke="currentColor" d="M-19-15l16 4 9-10 3 11 16-3-9 13 8 8-17-1-7 8-5-10-13 1 7-10Z"/>
+    <path d="${signal}" fill="none" stroke="currentColor" stroke-width="3.5"/></g>
+  </svg>`;
+  const caption = document.createElement('span');
+  caption.textContent = message;
+  stamp.append(caption);
   banner.replaceChildren(stamp);
   feedbackTimer = setTimeout(() => banner.replaceChildren(), 2600);
 }

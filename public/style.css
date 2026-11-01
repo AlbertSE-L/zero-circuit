@@ -62,3 +62,12 @@ button.secondary, input, select { background: #352d3b; color: #fff8eb; }
 @keyframes pair-wobble {25%{transform:translateX(-6px)}65%{transform:translateX(4px)}}
 @keyframes pair-drop {from{transform:translateY(-20px) rotate(3deg);opacity:.3}}
 }
+.pair-stamp {width:min(330px,92vw);padding:0 0 9px;overflow:hidden}
+.pair-stamp svg {display:block;width:100%;height:auto}
+.pair-stamp span {display:block;padding:3px 10px;font-size:clamp(14px,3vw,18px)}
+body {isolation:isolate;position:relative}
+body::before {content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background:radial-gradient(ellipse at 82% 20%,#d85c91,transparent 58%);opacity:.04}
+@media(prefers-reduced-motion:no-preference){
+  body::before {animation:ambient-ink 10s ease-in-out infinite alternate}
+  @keyframes ambient-ink {from{opacity:.025}to{opacity:.075}}
+}
