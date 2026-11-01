@@ -55,9 +55,15 @@ export function applyAction(game,players,playerId,action) {
   else throw new Error('不支持的操作');
   advance(game,players);
 }
+function playerNotes(viewer){return (viewer.notes||[]).map(note=>note.kind && note.text.endsWith('是undefined。') ? {...note,text:note.text.replace(/undefined。$/, {blue:'蓝色数字线',amber:'琥珀线',red:'红色危险线'}[note.kind]+'。')} : note);}
 export function playerView(room,viewerId) {
   const viewer=room.players.find(p=>p.id===viewerId);if(!viewer)throw new Error('无权访问房间');
-  return {code:room.code,version:room.version,hostId:room.hostId,capacity:room.capacity,challengeId:room.challengeId,viewerId,
+  const refereeActive=room.referee===true;
+  const debug=refereeActive&&viewerId===room.hostId ? {
+    events:room.audit||[],
+    notes:room.players.flatMap(member=>playerNotes(member).map(note=>member.name+' · '+note.text))
+  } : undefined;
+  return {refereeActive,debug,code:room.code,version:room.version,hostId:room.hostId,capacity:room.capacity,challengeId:room.challengeId,viewerId,
     players:room.players.map(p=>({id:p.id,name:p.name,skill:p.skill,skillUsed:p.skillUsed,beaconUsed:p.beaconUsed,hand:(p.hand||[]).map(t=>({id:t.id,slot:t.slot,removed:t.removed,hint:t.hint,...(p.id===viewerId||t.removed?{kind:t.kind,value:t.value}:{})}))})),
-    notes:(viewer.notes||[]).map(note=>note.kind && note.text.endsWith('是undefined。') ? {...note,text:note.text.replace(/undefined。$/, {blue:'蓝色数字线',amber:'琥珀线',red:'红色危险线'}[note.kind]+'。')} : note),game:room.game?{...room.game}:null};
+    notes:playerNotes(viewer),game:room.game?{...room.game}:null};
 }

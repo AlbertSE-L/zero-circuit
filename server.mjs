@@ -37,7 +37,7 @@ export function createServer({dataDir=new URL('./.data/',base)}={}) {
         if(rooms.size>=100)throw new Error('房间数已达上限');let code;do{code=String(randomInt(100000,1000000));}while(rooms.has(code));
         const player={id:id(),token:secret(),name:nameOf(body.name)},room={schema:1,code,hostId:player.id,players:[player],game:null,version:1};configure(room);persist(room);return send(res,201,{token:player.token,room:playerView(room,player.id)});
       }
-      const m=url.pathname.match(/^\/api\/rooms\/(\d{6})(?:\/(join|start|action|reset|configure|kick|transfer))?$/);if(!m)return send(res,404,{error:'接口不存在'});
+      const m=url.pathname.match(/^\/api\/rooms\/(\d{6})(?:\/(join|start|action|reset|configure|kick|transfer|referee))?$/);if(!m)return send(res,404,{error:'接口不存在'});
       const stored=rooms.get(m[1]);if(!stored)return send(res,404,{error:'房间不存在，请检查房间号'});const action=m[2];
       const r=structuredClone(stored);
       if(req.method==='POST'&&action==='join'){
@@ -51,11 +51,19 @@ export function createServer({dataDir=new URL('./.data/',base)}={}) {
       if(action!=='action'&&p.id!==r.hostId)return send(res,403,{error:'只有房主可以进行此操作'});
       if(action==='start'){
         if(r.game)throw new Error('已经开始，不能重复发牌');if(r.players.length!==r.capacity)throw new Error('请等待所有玩家到齐');r.game=startGame(r.players,challenges.find(c=>c.id===r.challengeId),r.hostId);
-      }else if(action==='action'){if(!r.game)throw new Error('还未开始');applyAction(r.game,r.players,p.id,body.action||{});}
-      else if(action==='reset'){r.game=null;r.players.forEach(p=>{delete p.hand;delete p.notes;delete p.skill;delete p.skillUsed;delete p.beaconUsed;});}
+      }else if(action==='action'){if(!r.game)throw new Error('还未开始');const beforeNotes=p.notes.length;
+        const choice=body.action||{};
+        const selected=r.players.flatMap(member=>member.hand).filter(tile=>tile.id===choice.ownId||tile.id===choice.targetId);
+        const labels={blue:'蓝线',amber:'琥珀线',red:'危险线'};
+        applyAction(r.game,r.players,p.id,choice);
+        r.audit??=[];
+        r.audit.push({time:Date.now(),text:[p.name,choice.type,...selected.map(tile=>tile.ownerName+' '+tile.slot+'号位 '+labels[tile.kind]+' '+tile.value),...p.notes.slice(beforeNotes).map(note=>note.text),r.game.logs.at(-1)].join(' · ')});
+        r.audit=r.audit.slice(-200);}
+      else if(action==='referee'){if(typeof body.enabled!=='boolean')throw new Error('开关无效');r.referee=body.enabled;}
+      else if(action==='reset'){r.game=null;r.audit=[];r.referee=false;r.players.forEach(p=>{delete p.hand;delete p.notes;delete p.skill;delete p.skillUsed;delete p.beaconUsed;});}
       else if(action==='configure'){if(r.game)throw new Error('先返回准备室再修改');configure(r);}
       else if(action==='kick'){if(r.game)throw new Error('只能在准备室移除玩家');if(body.playerId===r.hostId)throw new Error('不能移除房主');r.players=r.players.filter(p=>p.id!==body.playerId);}
-      else if(action==='transfer'){if(!r.players.some(p=>p.id===body.playerId))throw new Error('玩家不存在');r.hostId=body.playerId;}
+      else if(action==='transfer'){if(!r.players.some(p=>p.id===body.playerId))throw new Error('玩家不存在');r.hostId=body.playerId;r.referee=false;}
       else return send(res,404,{error:'操作不存在'});
       r.version++;persist(r);return send(res,200,playerView(r,p.id));
     }catch(e){console.error(e.code?e.message:'');send(res,e.code?500:400,{error:e.code?'本机保存失败，操作未提交，请检查磁盘权限与空间':e.message});}
