@@ -65,7 +65,7 @@ function showPairResult(room, targetId) {
   banner.replaceChildren(stamp);
   feedbackTimer = setTimeout(() => banner.replaceChildren(), 2600);
 }
-async function mutate(action,body={}){if(!session||!view)return;const next=await api(`/rooms/${view.code}/${action}`,'POST',{...body,version:view.version});view=next;ownId=targetId=null;render();if(body.action?.type==="pair" && next.game?.status!=="won")showPairResult(next,body.action.targetId);}
+async function mutate(action,body={}){if(!session||!view)return;const next=await api(`/rooms/${view.code}/${action}`,'POST',{...body,version:view.version});view=next;ownId=targetId=null;render();if(body.action?.type==="pair" && next.game?.status==="playing")showPairResult(next,body.action.targetId);}
 function forget(){session=view=null;revealed=privateShown=false;localStorage.removeItem(storageKey);history.replaceState(null,'','/');home();}
 function me(){return view.players.find(p=>p.id===view.viewerId);}
 function button(id,fn){const el=document.getElementById(id);if(el)el.onclick=ev=>perform(ev,fn);}
@@ -74,11 +74,11 @@ function bindCommon(){button('copy-invite',async()=>{const address=(location.hos
 const rimToggle = document.querySelector('#rim-toggle');
 function setRim(off) {
   document.body.classList.toggle('rim-off', off);
-  rimToggle.textContent = off ? '开启背景闪烁' : '关闭背景闪烁';
+  rimToggle.checked = !off;
 }
 setRim(localStorage.getItem('zero-circuit-rim') === 'off');
-rimToggle.onclick = () => {
-  const off = !document.body.classList.contains('rim-off');
+rimToggle.onchange = () => {
+  const off = !rimToggle.checked;
   setRim(off);
   localStorage.setItem('zero-circuit-rim', off ? 'off' : 'on');
 };
@@ -86,15 +86,41 @@ const victory = document.querySelector('#victory');
 let lastEnding = '', victoryTimer;
 function hideVictory() { clearTimeout(victoryTimer); victory.hidden = true; }
 document.querySelector('#skip-victory').onclick = hideVictory;
-function syncVictory() {
-  if (view.game?.status !== 'won') { lastEnding = ''; hideVictory(); return; }
+let previousSkills = null;
+function present(kind, label, artwork, title, detail, duration) {
+  clearTimeout(victoryTimer);
+  victory.dataset.scene = kind;
+  const panel = victory.querySelector('.final-panel');
+  panel.querySelector('small').textContent = label;
+  panel.querySelector('.skyline').textContent = artwork;
+  panel.querySelector('h2').textContent = title;
+  panel.querySelector('p').textContent = detail;
+  document.querySelector('#skip-victory').textContent = kind === 'skill' ? '继续行动' : '查看结算';
+  victory.hidden = false;
+  victoryTimer = setTimeout(hideVictory, duration);
+}
+function syncScenes() {
+  const game = view.game;
+  if (!game) { previousSkills = null; lastEnding = ''; hideVictory(); return; }
   const key = view.code + ':' + view.viewerId;
+  const used = new Set(view.players.filter(player => player.skillUsed).map(player => player.id));
+  const actor = previousSkills?.key === key && view.players.find(player => used.has(player.id) && !previousSkills.used.has(player.id));
+  previousSkills = {key, used};
+  if (game.status === 'playing') {
+    lastEnding = '';
+    if (actor) {
+      const skill = catalog.skills.find(item => item.id === actor.skill);
+      present('skill','SIGNAL / ABILITY','◇ ━━━ ◎ ━━━ ◇',skill.name,actor.name + ' 发动了技能。',2000);
+    }
+    return;
+  }
   if (lastEnding === key) return;
   lastEnding = key;
-  victory.hidden = false;
-  victoryTimer = setTimeout(hideVictory, 4200);
+  if (game.status === 'won') present('won','ZERO CIRCUIT / SIGNAL RESTORED','▂ ▅ ▃ ▇ ▄ ▆ ▂ ▅ ▃ ▇','全城来电','最后一道回路接通了。',4200);
+  else if (game.fuse === 0) present('drain','SYSTEM / POWER DOWN','▇ ▆ ▅ ▄ ▃ ▂ ▁','容错耗尽','最后一格容错用尽，系统进入保护停机。',3300);
+  else present('red','DANGER / LINE BREAK','━━━ ╱╲ ϟ ╱╲ ━━━','红线断裂','触碰危险线路，系统紧急停机。',3300);
 }
-function render(){syncVictory();const c=catalog.challenges.find(c=>c.id===view.challengeId),host=view.hostId===view.viewerId;syncMusic(host);const toggle=host?'<button id="referee" class="ghost">'+(view.refereeActive?'退出超级玩家':'成为超级玩家')+'</button>':'';
+function render(){syncScenes();const c=catalog.challenges.find(c=>c.id===view.challengeId),host=view.hostId===view.viewerId;syncMusic(host);const toggle=host?'<button id="referee" class="ghost">'+(view.refereeActive?'退出超级玩家':'成为超级玩家')+'</button>':'';
 const log=view.debug?'<section class="panel"><h2>法官日志</h2><p>最近 200 次成功行动，最新在前。升级前的私人探测保留在下方。</p><ol>'+view.debug.events.slice().reverse().map(event=>'<li>'+e(new Date(event.time).toLocaleTimeString())+' · '+e(event.text)+'</li>').join('')+'</ol><h3>私人探测记录</h3><ul>'+view.debug.notes.map(note=>'<li>'+e(note)+'</li>').join('')+'</ul></section>':'';
 root.innerHTML=header(c)+toggle+(view.refereeActive?'<p class="pill">房主已开启超级玩家模式，可查看私人探测结果</p>':'')+log+(view.game?board(c,host):lobby(c,host));bindCommon();button('referee',async()=>{if(view.refereeActive||confirm('开启后你将看到玩家秘密，所有人都能看到模式提示。继续？'))await mutate('referee',{enabled:!view.refereeActive});});if(view.game)bindBoard(host);else bindLobby(host);}
 function lobby(c,host){const joinBase=(location.hostname==='localhost'||location.hostname==='127.0.0.1')?catalog.addresses[0]?.url:location.origin;

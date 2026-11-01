@@ -92,3 +92,22 @@ body::before {
   @keyframes final-arrival {from{opacity:0;transform:translateY(18px) rotate(-2deg)}}
   @keyframes light-districts {from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}
 }
+.rim-switch{display:inline-flex;align-items:center;gap:8px;min-height:44px;position:relative;cursor:pointer;font-size:12px}
+.rim-switch input{position:absolute;opacity:0;width:1px;height:1px}
+.rim-switch i{width:38px;height:22px;border-radius:20px;background:#423d47;border:1px solid #a09aa4;position:relative}
+.rim-switch i::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;background:white;border-radius:50%}
+.rim-switch input:checked+i{background:#a22d55}
+.rim-switch input:checked+i::after{transform:translateX(16px)}
+.rim-switch input:focus-visible+i{outline:2px solid #ffe560;outline-offset:3px}
+#victory[data-scene=red] .skyline{color:#ff537d;border-color:currentColor}
+#victory[data-scene=drain] .skyline{color:#ffa84d;border-color:currentColor}
+#victory[data-scene=skill] .skyline{color:#76e6ef;border-color:currentColor}
+@media(prefers-reduced-motion:no-preference){
+.rim-switch i::after{transition:transform .14s}
+#victory[data-scene=red] .skyline{animation:fracture .45s ease-out}
+#victory[data-scene=drain] .skyline{animation:discharge 1.4s steps(7,end) forwards}
+#victory[data-scene=skill] .skyline{animation:scanline .55s ease-out}
+@keyframes fracture {25%{transform:skew(-15deg) translateX(-6px)}65%{transform:skew(8deg) translateX(3px)}}
+@keyframes discharge {to{clip-path:inset(0 88% 0 0);opacity:.45}}
+@keyframes scanline {from{clip-path:inset(0 50%)}to{clip-path:inset(0)}}
+}
