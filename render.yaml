@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: zero-circuit
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: node --check server.mjs
+    startCommand: node server.mjs
+    healthCheckPath: /

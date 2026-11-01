@@ -22,9 +22,10 @@ export function createServer({dataDir=new URL('./.data/',base)}={}) {
         const item=paths[url.pathname];if(req.method!=='GET'||!item)return send(res,404,{error:'页面不存在'});
         res.writeHead(200,{'Content-Type':item[1]+'; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"});return res.end(readFileSync(new URL(item[0],base)));
       }
-      if(req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`)return send(res,403,{error:'拒绝跨站请求'});
+      const expectedOrigin=process.env.RENDER_EXTERNAL_URL || `http://${req.headers.host}`;
+      if(req.headers.origin && req.headers.origin!==expectedOrigin)return send(res,403,{error:'拒绝跨站请求'});
       const now=Date.now(),ip=req.socket.remoteAddress;let limit=rate.get(ip);if(!limit||now-limit.time>60000)rate.set(ip,limit={time:now,n:0});if(++limit.n>1200)return send(res,429,{error:'请求过多，稍后再试'});
-      if(req.method==='GET'&&url.pathname==='/api/catalog')return send(res,200,{rules:rulesInfo,challenges,skills:skills.map(({id,name,description,target})=>({id,name,description,target})),addresses:addresses(server.address()?.port||8790)});
+      if(req.method==='GET'&&url.pathname==='/api/catalog')return send(res,200,{rules:rulesInfo,challenges,skills:skills.map(({id,name,description,target})=>({id,name,description,target})),addresses:process.env.RENDER_EXTERNAL_URL?[]:addresses(server.address()?.port||8790)});
       let body={};if(req.method==='POST'){
         if(!req.headers['content-type']?.startsWith('application/json'))return send(res,415,{error:'需要 JSON 请求'});
         let text='';for await(const chunk of req){text+=chunk;if(text.length>10000)return send(res,413,{error:'请求过大'});}
