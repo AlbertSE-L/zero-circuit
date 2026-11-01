@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {handleGang} from './gang/handler.mjs';
 import {readFileSync,writeFileSync,renameSync,mkdirSync,existsSync,readdirSync} from 'node:fs';
 import {randomBytes,randomInt} from 'node:crypto';
 import {networkInterfaces} from 'node:os';
@@ -17,8 +18,9 @@ export function createServer({dataDir=new URL('./.data/',base)}={}) {
   const server=http.createServer(async(req,res)=>{
     try {
       const url=new URL(req.url,'http://local');
+      if(url.pathname.startsWith('/gang/'))return handleGang(req,res,url.pathname);
       if(!url.pathname.startsWith('/api/')){
-        const paths={'/':['public/index.html','text/html'],'/music.js':['public/music.js','text/javascript'],'/app.js':['public/app.js','text/javascript'],'/style.css':['public/style.css','text/css']};
+        const paths={'/':[url.searchParams.has('room')?'public/index.html':'public/hub.html','text/html'],'/circuit':['public/index.html','text/html'],'/music.js':['public/music.js','text/javascript'],'/app.js':['public/app.js','text/javascript'],'/style.css':['public/style.css','text/css']};
         const item=paths[url.pathname];if(req.method!=='GET'||!item)return send(res,404,{error:'页面不存在'});
         res.writeHead(200,{'Content-Type':item[1]+'; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"});return res.end(readFileSync(new URL(item[0],base)));
       }
