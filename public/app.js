@@ -18,7 +18,30 @@ document.querySelector('#join-form').onsubmit=ev=>perform(ev,async()=>{const cod
 function enter(result){session={token:result.token,code:result.room.code};localStorage.setItem(storageKey,JSON.stringify(session));view=result.room;ownId=targetId=null;revealed=privateShown=false;history.replaceState(null,'','/?room='+view.code);render();clearInterval(poll);poll=setInterval(refresh,2200);}
 async function refresh(){if(!session||reading)return;reading=true;try{const next=await api('/rooms/'+session.code);if(!view||next.version!==view.version){if(!next.game||!view?.game){revealed=privateShown=false;}view=next;const all=view.players.flatMap(p=>p.hand);if(!all.some(t=>t.id===ownId&&!t.removed))ownId=null;if(!all.some(t=>t.id===targetId&&!t.removed))targetId=null;render();}if(notice.textContent.startsWith('连接中断'))notice.textContent='';}catch(err){if(err.status===403||err.status===404){forget();errorMessage(err);}else notice.textContent='连接中断，正在自动重连。请保持电脑服务运行并检查 Wi-Fi。';}finally{reading=false;}}
 async function perform(event,fn){event?.preventDefault();if(busy)return;busy=true;notice.textContent='';try{await fn();}catch(err){if(err.status===409)await refresh();errorMessage(err);}finally{busy=false;}}
-async function mutate(action,body={}){if(!session||!view)return;const next=await api(`/rooms/${view.code}/${action}`,'POST',{...body,version:view.version});view=next;ownId=targetId=null;render();}
+let feedbackTimer;
+function showPairResult(room, targetId) {
+  const target = room.players.flatMap(player => player.hand).find(tile => tile.id === targetId);
+  if (!target) return;
+  const banner = document.getElementById('pair-result');
+  let state, message;
+  if (room.game.status === 'lost') {
+    state = 'failure';
+    message = '× 行动失败 · ' + room.game.reason;
+  } else if (target.removed) {
+    state = 'success';
+    message = room.game.status === 'won' ? '✓ 配对成功 · 全部回路已接通' : '✓ 配对成功 · 两条线路已接通';
+  } else {
+    state = 'warning';
+    message = '！配对失误 · 剩余容错 ' + room.game.fuse + ' 格';
+  }
+  clearTimeout(feedbackTimer);
+  const stamp = document.createElement('strong');
+  stamp.className = 'pair-stamp ' + state;
+  stamp.textContent = message;
+  banner.replaceChildren(stamp);
+  feedbackTimer = setTimeout(() => banner.replaceChildren(), 2600);
+}
+async function mutate(action,body={}){if(!session||!view)return;const next=await api(`/rooms/${view.code}/${action}`,'POST',{...body,version:view.version});view=next;ownId=targetId=null;render();if(body.action?.type==="pair")showPairResult(next,body.action.targetId);}
 function forget(){session=view=null;revealed=privateShown=false;localStorage.removeItem(storageKey);history.replaceState(null,'','/');home();}
 function me(){return view.players.find(p=>p.id===view.viewerId);}
 function button(id,fn){const el=document.getElementById(id);if(el)el.onclick=ev=>perform(ev,fn);}
