@@ -33,17 +33,23 @@ export function strength(cards){
 export function deal(r){
  const deck=Array.from({length:52},(_,i)=>i);
  for(let i=51;i>0;i--){const j=randomInt(i+1);[deck[i],deck[j]]=[deck[j],deck[i]]}
- r.hands=r.players.map(()=>deck.splice(0,2));r.board=deck.splice(0,5);r.stage=0;r.phase='play';r.chips=r.players.map(()=>0);r.history=[];r.ready=[];
+ r.hands=r.players.map(()=>deck.splice(0,2));r.board=deck.splice(0,5);const dealt=[...r.hands.flat(),...r.board];if(new Set(dealt).size!==dealt.length)throw Error('牌堆重复，取消发牌');r.events=[];r.stage=0;r.phase='play';r.chips=r.players.map(()=>0);r.history=[];r.ready=[];
 }
 export function act(r,i,cmd,value){
  if(r.phase!=='play')throw Error('当前不在选筹阶段');
  if(cmd==='chip'){
  if(!Number.isInteger(value)||value<0||value>r.players.length)throw Error('筹码无效');
- const owner=r.chips.indexOf(value);
+ const owner=r.chips.indexOf(value), old=r.chips[i];
+ if(value===old)throw Error('牌力强度未改变');
  if(r.mods.includes('fixed')&&(r.chips[i]||!value||owner>=0))throw Error('本轮只能领取空闲筹码一次');
  if(value&&owner>=0&&owner!==i){if(r.mods.includes('lock'))throw Error('请等待持有人退回');r.chips[owner]=0}
- r.chips[i]=value;r.ready=[];return}
+  r.events??=[];
+ const who=r.players[i].name, action=!value?'退回了 '+old:value&&owner>=0?'从 '+r.players[owner].name+' 手中抢走了 '+value:'从桌面拿起了 '+value;
+ r.events.push({stage:r.stage,text:who+' '+action+' 号牌力筹码'+(old&&value?'，原 '+old+' 号退回桌面':'')});
+ r.chips[i]=value;r.ready=[];return;
+ } else
  if(cmd!=='ready'||r.chips.includes(0))throw Error('全员各持一枚筹码才能确认');
+
  if(!r.ready.includes(i))r.ready.push(i);
  if(r.ready.length<r.players.length)return;
  r.history.push([...r.chips]);r.ready=[];
@@ -56,7 +62,7 @@ export function act(r,i,cmd,value){
 export function view(r,i){
  const end=r.phase==='result', has=k=>r.mods.includes(k), visible=[has('peek')?1:0,3,has('turn')?3:4,has('blind')?4:5][r.stage]||0;
  const board=(r.board||[]).slice(0,end?5:visible);
- return {canUndo:i===0 && !!r.undo?.length,code:r.code,v:r.v,me:i,phase:r.phase,stage:r.stage,mods:r.mods,wins:r.wins,losses:r.losses,success:r.success,ready:r.ready||[],history:has('fog')&&!end?[]:r.history||[],occupied:(r.chips||[]).filter(Boolean),board:board.map(c=>has('suitfog')&&!end?label(c).slice(0,-1)+'？':label(c)),players:r.players.map((p,j)=>{
+ return {events:(r.events||[]).filter(event=>end||!has('mute')&&(!has('fog')||event.stage===r.stage)),canUndo:i===0 && !!r.undo?.length,code:r.code,v:r.v,me:i,phase:r.phase,stage:r.stage,mods:r.mods,wins:r.wins,losses:r.losses,success:r.success,ready:r.ready||[],history:has('fog')&&!end?[]:r.history||[],occupied:(r.chips||[]).filter(Boolean),board:board.map(c=>has('suitfog')&&!end?label(c).slice(0,-1)+'？':label(c)),players:r.players.map((p,j)=>{
  const h=r.hands?.[j]||[],[a,b]=h, hints=[];
  if(h.length){for(const [key,text] of Object.entries({suited:'同花色 '+(Math.floor(a/13)===Math.floor(b/13)?'是':'否'),pair:'口袋对子 '+(a%13===b%13?'是':'否'),ace:'持 A '+(h.some(c=>c%13===12)?'是':'否'),gap:'相邻 '+(Math.abs(a%13-b%13)===1?'是':'否'),face:'人像 '+h.filter(c=>c%13>=9&&c%13<=11).length,color:'红牌 '+h.filter(c=>[1,2].includes(Math.floor(c/13))).length}))if(has(key))hints.push(text)}
  const score=end||j===i&&has('oracle')&&board.length>=3&&!has('suitfog')?strength([...h,...board]):null;
