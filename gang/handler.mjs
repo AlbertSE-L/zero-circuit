@@ -1,8 +1,22 @@
 
 import {randomBytes,randomInt} from 'node:crypto';
-import {readFileSync} from 'node:fs';
+import {readFileSync, mkdirSync, readdirSync, writeFileSync, renameSync} from 'node:fs';
 import {act,deal,view,mods} from './engine.mjs';
 const rooms=new Map(), html=readFileSync(new URL('./index.html',import.meta.url));
+const saves = new URL('../.data/gang/', import.meta.url);
+mkdirSync(saves,{recursive:true});
+for (const file of readdirSync(saves)) {
+  if (!/^[0-9]{6}[.]json$/.test(file)) continue;
+  const room = JSON.parse(readFileSync(new URL(file,saves),'utf8'));
+  if (room.code + '.json' !== file) throw Error('帮派存档房号错误');
+  rooms.set(room.code, room);
+}
+function commit(room) {
+  const temp = new URL(room.code+'.tmp', saves);
+  writeFileSync(temp, JSON.stringify(room), {mode:0o600});
+  renameSync(temp,new URL(room.code+'.json',saves));
+  rooms.set(room.code,room);
+}
 export async function handleGang(req,res,path){
  function json(obj,status=200){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(obj))}
  try{
@@ -13,7 +27,8 @@ export async function handleGang(req,res,path){
  let raw='';for await(const part of req){raw+=part;if(raw.length>4096)throw Error('请求过大')}
  const b=JSON.parse(raw), player=()=>{const name=String(b.name||'').trim().slice(0,16);if(!name)throw Error('请输入昵称');return {name,token:randomBytes(24).toString('hex')}};
  let r=rooms.get(b.code),i=r?.players.findIndex(p=>p.token===b.token)??-1;
- if(b.cmd==='create'){let code;do{code=String(randomInt(100000,1000000))}while(rooms.has(code));r={code,v:0,players:[player()],phase:'lobby',wins:0,losses:0,mods:[]};rooms.set(code,r);i=0}
+ if(r && b.cmd!=='read')r=structuredClone(r);
+ if(b.cmd==='create'){let code;do{code=String(randomInt(100000,1000000))}while(rooms.has(code));r={code,v:0,players:[player()],phase:'lobby',wins:0,losses:0,mods:[]};i=0}
  else if(!r)throw Error('房间不存在');
  else if(b.cmd==='join'){if(r.phase!=='lobby'||r.players.length>=6)throw Error('无法入座');const p=player();if(r.players.some(x=>x.name===p.name))throw Error('昵称重复');i=r.players.push(p)-1}
  else {if(i<0)throw Error('席位无效');if(b.cmd==='read')return json(view(r,i));if(b.v!==r.v)throw Error('桌面刚有变化，请重试');
@@ -26,6 +41,6 @@ export async function handleGang(req,res,path){
  else if(b.cmd==='next'){if(r.phase!=='result'||Math.max(r.wins,r.losses)>=3)throw Error('无法继续');deal(r)}
  else if(b.cmd==='again'){if(r.phase!=='result'||Math.max(r.wins,r.losses)!==3)throw Error('比赛未结束');Object.assign(r,{phase:'lobby',wins:0,losses:0,hands:null,board:null,history:[],chips:[],ready:[],stage:0})}
  else act(r,i,b.cmd,b.value)}
- r.v++;json({...view(r,i),...(['create','join'].includes(b.cmd)?{token:r.players[i].token}:{})})
+ r.v++;commit(r);json({...view(r,i),...(['create','join'].includes(b.cmd)?{token:r.players[i].token}:{})})
  }catch(e){json({error:e.message},400)}
 }

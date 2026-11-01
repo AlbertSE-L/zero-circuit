@@ -25,9 +25,19 @@ table.innerHTML=html}
 async function send(cmd,value){if(busy)return;busy=true;try{const body={...session,cmd,value,v:state?.v};if(['create','join'].includes(cmd)){body.name=document.querySelector('#name').value;body.code=document.querySelector('#code').value}
 const result=await(await fetch('/gang/room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();if(result.error){if(cmd==='read'&&['房间不存在','席位无效'].includes(result.error)){session=null;sessionStorage.removeItem('gang');home()}throw Error(result.error)}
 if(result.token){session={token:result.token,code:result.code};sessionStorage.setItem('gang',JSON.stringify(session))}
-if(!state||result.v!==state.v){if(state?.phase!==result.phase)show=false;state=result;render()}if(cmd!=='read')err.textContent='';}catch(e){err.textContent=e.message}finally{busy=false}}
+if(session)localStorage.setItem('gang-last-seat',JSON.stringify(session));
+if(cmd==='read' && err.dataset.connection){err.textContent='';delete err.dataset.connection}
+if(!state||result.v!==state.v){if(state?.phase!==result.phase)show=false;state=result;render()}if(cmd!=='read')err.textContent='';}catch(e){if(e instanceof TypeError && session){err.dataset.connection='retry';err.textContent='连接中断，正在尝试恢复原座位…'}else err.textContent=e.message}finally{busy=false}}
 table.onchange=e=>{if(e.target.id==='game'){const zero=e.target.value==='zero';document.querySelector('#gang-form').hidden=zero;document.querySelector('#open-zero').hidden=!zero}};
 table.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.c==='zero'){location.assign('/circuit');return}if(b.dataset.c==='show'){show=!show;render();return}send(b.dataset.c,b.dataset.c==='chip'?Number(b.dataset.value):b.dataset.value)};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&show){show=false;render()}});
-home();if(session)await send('read');setInterval(()=>{if(session)send('read')},1500)
+home();
+if(!session && localStorage.getItem('gang-last-seat')){
+ const saved=JSON.parse(localStorage.getItem('gang-last-seat'));
+ const resume=document.createElement('button');
+ resume.textContent='恢复最近座位 · '+saved.code;
+ resume.onclick=()=>{session=saved;sessionStorage.setItem('gang',JSON.stringify(saved));send('read')};
+ table.prepend(resume);
+}
+if(session)await send('read');setInterval(()=>{if(session)send('read')},1500)
 </script></html>
