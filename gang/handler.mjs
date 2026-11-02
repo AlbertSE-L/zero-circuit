@@ -1,6 +1,7 @@
 
 import {randomBytes,randomInt} from 'node:crypto';
 import {readFileSync, mkdirSync, readdirSync, writeFileSync, renameSync} from 'node:fs';
+import {record} from '../analytics.mjs';
 import {act,deal,view,mods} from './engine.mjs';
 const rooms=new Map(), html=readFileSync(new URL('./index.html',import.meta.url));
 const saves = new URL('../.data/gang/', import.meta.url);
@@ -20,7 +21,7 @@ function commit(room) {
 export async function handleGang(req,res,path){
  function json(obj,status=200){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(obj))}
  try{
- if(path==='/gang/'&&req.method==='GET'){res.setHeader('Content-Type','text/html;charset=utf-8');return res.end(html)}
+ if(path==='/gang/'&&req.method==='GET'){record(req,res,'visit','gang');res.setHeader('Content-Type','text/html;charset=utf-8');return res.end(html)}
  if(path==='/gang/mods')return json(mods);
  if(path!=='/gang/room'||req.method!=='POST')return json({error:'页面不存在'},404);
  if(req.headers.origin&&req.headers.origin!==(process.env.RENDER_EXTERNAL_URL || 'http://'+req.headers.host))throw Error('跨站请求');
@@ -41,6 +42,6 @@ export async function handleGang(req,res,path){
  else if(b.cmd==='next'){if(r.phase!=='result'||Math.max(r.wins,r.losses)>=3)throw Error('无法继续');deal(r)}
  else if(b.cmd==='again'){if(r.phase!=='result'||Math.max(r.wins,r.losses)!==3)throw Error('比赛未结束');r.mods=r.initialMods||r.mods;r.undo=[];Object.assign(r,{phase:'lobby',wins:0,losses:0,hands:null,board:null,history:[],chips:[],ready:[],stage:0})}
  else act(r,i,b.cmd,b.value)}
- r.v++;commit(r);json({...view(r,i),...(['create','join'].includes(b.cmd)?{token:r.players[i].token}:{})})
+ r.v++;commit(r);if(['create','join','start'].includes(b.cmd))record(req,res,b.cmd,'gang',r.code,r.players[i].name);json({...view(r,i),...(['create','join'].includes(b.cmd)?{token:r.players[i].token}:{})})
  }catch(e){json({error:e.message},400)}
 }

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {record} from './analytics.mjs';
 import {handleGang} from './gang/handler.mjs';
 import {readFileSync,writeFileSync,renameSync,mkdirSync,existsSync,readdirSync} from 'node:fs';
 import {randomBytes,randomInt} from 'node:crypto';
@@ -18,10 +19,12 @@ export function createServer({dataDir=new URL('./.data/',base)}={}) {
   const server=http.createServer(async(req,res)=>{
     try {
       const url=new URL(req.url,'http://local');
+      if(url.pathname==='/healthz')return send(res,200,{ok:true});
       if(url.pathname.startsWith('/gang/'))return handleGang(req,res,url.pathname);
       if(!url.pathname.startsWith('/api/')){
         const paths={'/':[url.searchParams.has('room')?'public/index.html':'public/hub.html','text/html'],'/circuit':['public/index.html','text/html'],'/music.js':['public/music.js','text/javascript'],'/app.js':['public/app.js','text/javascript'],'/style.css':['public/style.css','text/css']};
         const item=paths[url.pathname];if(req.method!=='GET'||!item)return send(res,404,{error:'页面不存在'});
+        if(item[1]==='text/html')record(req,res,'visit',item[0]==='public/hub.html'?'hub':'circuit');
         res.writeHead(200,{'Content-Type':item[1]+'; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"});return res.end(readFileSync(new URL(item[0],base)));
       }
       const expectedOrigin=process.env.RENDER_EXTERNAL_URL || `http://${req.headers.host}`;
@@ -38,14 +41,14 @@ export function createServer({dataDir=new URL('./.data/',base)}={}) {
       function configure(r){const c=challenges.find(c=>c.id===body.challengeId);if(!c)throw new Error('关卡不存在');const n=Number(body.capacity);if(!Number.isInteger(n)||n<2||n>5||n<r.players.length)throw new Error('房间人数需为 2–5，且不能小于已加入人数');r.capacity=n;r.challengeId=c.id;}
       if(req.method==='POST'&&url.pathname==='/api/rooms'){
         if(rooms.size>=100)throw new Error('房间数已达上限');let code;do{code=String(randomInt(100000,1000000));}while(rooms.has(code));
-        const player={id:id(),token:secret(),name:nameOf(body.name)},room={schema:1,code,hostId:player.id,players:[player],game:null,version:1};configure(room);persist(room);return send(res,201,{token:player.token,room:playerView(room,player.id)});
+        const player={id:id(),token:secret(),name:nameOf(body.name)},room={schema:1,code,hostId:player.id,players:[player],game:null,version:1};configure(room);persist(room);record(req,res,'create','circuit',code,player.name);return send(res,201,{token:player.token,room:playerView(room,player.id)});
       }
       const m=url.pathname.match(/^\/api\/rooms\/(\d{6})(?:\/(join|start|action|reset|configure|kick|transfer|referee))?$/);if(!m)return send(res,404,{error:'接口不存在'});
       const stored=rooms.get(m[1]);if(!stored)return send(res,404,{error:'房间不存在，请检查房间号'});const action=m[2];
       const r=structuredClone(stored);
       if(req.method==='POST'&&action==='join'){
         if(r.game)throw new Error('本局已开始。原玩家请使用原浏览器恢复，而不是重新加入');
-        if(r.players.length>=r.capacity)throw new Error('房间已满');const name=nameOf(body.name);if(r.players.some(p=>p.name===name))throw new Error('昵称已被使用');const p={id:id(),token:secret(),name};r.players.push(p);r.version++;persist(r);return send(res,201,{token:p.token,room:playerView(r,p.id)});
+        if(r.players.length>=r.capacity)throw new Error('房间已满');const name=nameOf(body.name);if(r.players.some(p=>p.name===name))throw new Error('昵称已被使用');const p={id:id(),token:secret(),name};r.players.push(p);r.version++;persist(r);record(req,res,'join','circuit',r.code,p.name);return send(res,201,{token:p.token,room:playerView(r,p.id)});
       }
       const auth=req.headers.authorization?.replace(/^Bearer /,'');const p=r.players.find(p=>p.token===auth);if(!p)return send(res,403,{error:'身份凭据失效，请重新加入'});
       if(req.method==='GET'&&!action){if(url.searchParams.get('since')===String(r.version)){res.writeHead(204,{'Cache-Control':'no-store'});return res.end()}return send(res,200,playerView(r,p.id))}
@@ -68,7 +71,7 @@ export function createServer({dataDir=new URL('./.data/',base)}={}) {
       else if(action==='kick'){if(r.game)throw new Error('只能在准备室移除玩家');if(body.playerId===r.hostId)throw new Error('不能移除房主');r.players=r.players.filter(p=>p.id!==body.playerId);}
       else if(action==='transfer'){if(!r.players.some(p=>p.id===body.playerId))throw new Error('玩家不存在');r.hostId=body.playerId;r.referee=false;}
       else return send(res,404,{error:'操作不存在'});
-      r.version++;persist(r);return send(res,200,playerView(r,p.id));
+      r.version++;persist(r);if(action==='start')record(req,res,'start','circuit',r.code,p.name);return send(res,200,playerView(r,p.id));
     }catch(e){console.error(e.code?e.message:'');send(res,e.code?500:400,{error:e.code?'本机保存失败，操作未提交，请检查磁盘权限与空间':e.message});}
   });
   server.requestTimeout=15000;server.headersTimeout=10000;

@@ -6,4 +6,9 @@ services:
     region: singapore
     buildCommand: node --check server.mjs
     startCommand: node server.mjs
-    healthCheckPath: /
+    healthCheckPath: /healthz
+    envVars:
+      - key: D1_ACCOUNT_ID
+        value: "9e7d6f1074db75f102eede498a2a0cc3"
+      - key: D1_DATABASE_ID
+        value: "9126bec9-e64a-48f5-8e8f-684075fb8d71"
