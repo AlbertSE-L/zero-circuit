@@ -6,5 +6,10 @@ CREATE TABLE IF NOT EXISTS events (
   browser_id TEXT,
   room TEXT,
   nickname TEXT,
-  is_test INTEGER NOT NULL DEFAULT 0
+  is_test INTEGER NOT NULL DEFAULT 0,
+  ip TEXT,
+  user_agent TEXT,
+  language TEXT,
+  referer TEXT,
+  path TEXT
 );
