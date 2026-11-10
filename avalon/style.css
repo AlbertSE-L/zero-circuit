@@ -1,0 +1,11 @@
+main{max-width:900px}h1{font-size:clamp(28px,5vw,44px)}.intro{padding:30px 0 18px}.intro h1{margin-bottom:8px}
+.setup{display:grid;grid-template-columns:1fr 1fr;gap:14px}.setup .wide{grid-column:1/-1}.setup label{display:block;font-size:14px;margin:12px 0 6px}
+.role-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.role-grid label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px}.role-grid input{width:70px}
+.seats{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.seat{padding:10px;border:1px solid var(--border);border-radius:4px}.seat.me{border-color:#ffe560}.seat.captain::before{content:'♛ ';color:#ffe560}
+.mission-track{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.mission-stop{padding:10px;border:1px solid var(--border);font-size:13px}.mission-stop.current{border-color:#ffe560}.mission-stop.passed{background:#174636}.mission-stop.failed{background:#582c3d}
+.private-card{border:2px solid #c997ff;padding:18px;margin:15px 0;background:#2c2239}.private-card h3{font-size:24px}.private-card.evil{border-color:#ff668b}.private-card.good{border-color:#95e2ce}
+.choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.choices button{white-space:normal;overflow-wrap:anywhere}.choices button.selected{outline:3px solid #ff668b;background:#ffe560}.choices button[aria-pressed="true"]::before{content:'✓ '}
+.status-line{padding:12px;border-left:4px solid #ffe560;background:#372d3c}.success-text{color:#95e2ce}.failure-text{color:#ff91ad}.log-list{padding-left:20px}.log-list li{margin:12px 0;line-height:1.8}.privacy{font-size:12px}
+button:disabled{opacity:.55}a{color:var(--mint)}.split-line{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.seat-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.seat-controls select{width:auto;max-width:100%}
+@media(max-width:580px){.setup{grid-template-columns:1fr}.setup .wide{grid-column:auto}.role-grid{grid-template-columns:1fr}.panel{padding:16px}.mission-stop{padding:8px}.choices{gap:8px}}
+@media(prefers-reduced-motion:no-preference){.private-card{animation:reveal .3s ease-out}@keyframes reveal{from{opacity:.3;transform:translateY(6px)}}}

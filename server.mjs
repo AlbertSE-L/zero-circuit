@@ -1,6 +1,7 @@
 import http from 'node:http';
 import {record} from './analytics.mjs';
 import {handleGang} from './gang/handler.mjs';
+import {createAvalonHandler} from './avalon/handler.mjs';
 import {readFileSync,writeFileSync,renameSync,mkdirSync,existsSync,readdirSync} from 'node:fs';
 import {randomBytes,randomInt} from 'node:crypto';
 import {networkInterfaces} from 'node:os';
@@ -10,6 +11,7 @@ import skills from './modules/skills.mjs';
 import {rulesInfo,startGame,applyAction,playerView} from './modules/rules.mjs';
 const base=new URL('./',import.meta.url),secret=()=>randomBytes(24).toString('hex'),id=()=>randomBytes(8).toString('hex');
 export function createServer({dataDir=new URL('./.data/',base)}={}) {
+  const handleAvalon=createAvalonHandler(dataDir);
   mkdirSync(dataDir,{recursive:true});const rooms=new Map(),rate=new Map();
   for(const file of readdirSync(dataDir))if(/^\d{6}\.json$/.test(file)) {
     try{const room=JSON.parse(readFileSync(new URL(file,dataDir),'utf8'));if(room.schema===1&&Date.now()-room.updated<7*86400_000)rooms.set(room.code,room);}catch{console.warn('跳过无法读取的房间文件：'+file);}
@@ -20,6 +22,8 @@ export function createServer({dataDir=new URL('./.data/',base)}={}) {
     try {
       const url=new URL(req.url,'http://local');
       if(url.pathname==='/healthz')return send(res,200,{ok:true});
+      if(url.pathname==='/avalon'){res.writeHead(302,{Location:'/avalon/'});return res.end()}
+      if(url.pathname.startsWith('/avalon/'))return handleAvalon(req,res,url.pathname);
       if(url.pathname.startsWith('/gang/'))return handleGang(req,res,url.pathname);
       if(!url.pathname.startsWith('/api/')){
         const paths={'/':[url.searchParams.has('room')?'public/index.html':'public/hub.html','text/html'],'/circuit':['public/index.html','text/html'],'/music.js':['public/music.js','text/javascript'],'/app.js':['public/app.js','text/javascript'],'/style.css':['public/style.css','text/css']};
